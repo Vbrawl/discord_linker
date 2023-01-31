@@ -13,10 +13,6 @@
  */
 
 
-// holds the version
-$discord_linker = array(0, 1, 0);
-
-
 
 
 define("LINK_TOKEN_DB", "dl_link_tokens");
@@ -45,7 +41,7 @@ function discord_linker_setup() {
 
 
     $wpdb->query(
-        "CREATE TABLE IF NOT EXISTS ".LINK_TOKEN_DB." (id BIGINT NOT NULL AUTO_INCREMENT, link_token VARCHAR(64) NOT NULL, expiration_date DATETIME NOT NULL, wp_user_id BIGINT NOT NULL, PRIMARY KEY(id));"
+        "CREATE TABLE IF NOT EXISTS ".$wpdb->prefix.LINK_TOKEN_DB." (id BIGINT NOT NULL AUTO_INCREMENT, link_token VARCHAR(64) NOT NULL, expiration_date DATETIME NOT NULL, wp_user_id BIGINT NOT NULL, PRIMARY KEY(id));"
     );
 
 
@@ -76,7 +72,7 @@ function discord_linker_unset() {
     global $wpdb;
 
     $wpdb->query(
-        "DROP TABLE IF EXISTS ".LINK_TOKEN_DB.";"
+        "DROP TABLE IF EXISTS ".$wpdb->prefix.LINK_TOKEN_DB.";"
     );
 
 
@@ -152,7 +148,7 @@ function delete_link_token($request) {
     $link_token = $request->get_param('link_token');
 
     $rows_affected = $wpdb->query(
-        $wpdb->prepare("DELETE FROM ".LINK_TOKEN_DB." WHERE link_token = %s;", $link_token)
+        $wpdb->prepare("DELETE FROM ".$wpdb->prefix.LINK_TOKEN_DB." WHERE link_token = %s;", $link_token)
     );
     if($rows_affected === false) {
         return new WP_Error(1, "Link token doesn't exist!");
@@ -174,7 +170,7 @@ function create_link_token($request) {
     $payload = hash(TOKEN_HASH_ALGORITHM, $payload);
 
     // Add to database
-    $query = $wpdb->prepare("INSERT INTO ".LINK_TOKEN_DB." (`link_token`, `expiration_date`, `wp_user_id`) VALUES (%s, date_add(NOW(), INTERVAL ".TOKEN_USAGE_DURATION_VALUE." ".TOKEN_USAGE_DURATION_TYPE."), %d);", $payload, $user_id);
+    $query = $wpdb->prepare("INSERT INTO ".$wpdb->prefix.LINK_TOKEN_DB." (`link_token`, `expiration_date`, `wp_user_id`) VALUES (%s, date_add(NOW(), INTERVAL ".TOKEN_USAGE_DURATION_VALUE." ".TOKEN_USAGE_DURATION_TYPE."), %d);", $payload, $user_id);
     $rows_affected = $wpdb->query($query);
 
     if($rows_affected != 0) {
@@ -232,7 +228,7 @@ function link_discord_to_user($request) {
 
 
     // Check if token is still active
-    $token = $wpdb->get_row($wpdb->prepare("SELECT id, wp_user_id FROM ".LINK_TOKEN_DB." WHERE link_token = %s AND expiration_date > NOW()", $link_token));
+    $token = $wpdb->get_row($wpdb->prepare("SELECT id, wp_user_id FROM ".$wpdb->prefix.LINK_TOKEN_DB." WHERE link_token = %s AND expiration_date > NOW()", $link_token));
     if($token === null) {
         return new WP_Error(1, "Connection Token doesn't exist!");
     }
