@@ -89,6 +89,11 @@ function discord_linker_unset() {
  */
 $REAL_WP_ID = null;
 $IMPERSONATED_WP_ID = null;
+
+function can_impersonate() {
+    return current_user_can(DISCORD_USER_IMPERSONATION);
+}
+
 function impersonate_user_by_discord_id($discord_id) {
     global $wpdb;
     global $REAL_WP_ID;
@@ -99,17 +104,17 @@ function impersonate_user_by_discord_id($discord_id) {
         $REAL_WP_ID = get_current_user_id();
 
 
-        $fake_user_id = $wpdb->get_var("SELECT user_id FROM {$wpdb->prefix} WHERE meta_key = 'discord_account_id' AND meta_value = %s", $discord_id);
+        $fake_user_id = $wpdb->get_var($wpdb->prepare("SELECT user_id FROM {$wpdb->prefix}usermeta WHERE meta_key = 'discord_account_id' AND meta_value = %s;", $discord_id));
         if($fake_user_id !== null) {
             $IMPERSONATED_WP_ID = intval($fake_user_id);
             wp_set_current_user($IMPERSONATED_WP_ID);
         }
         else {
-            throw new WP_Error(1, "Insufficient priviledges to impersonate another user");
+            return new WP_Error(1, "User to impersonate not found");
         }
     }
     else {
-        throw new WP_Error(2, "User impersonation already active");
+        return new WP_Error(2, "User impersonation already active");
     }
 
     return $IMPERSONATED_WP_ID;
@@ -267,14 +272,14 @@ function is_link_token($value) {
 
 
 
-function is_discord_id($value) {
+function dl_is_discord_id($value) {
     if(is_numeric($value) === false) {
-        return new WP_Error(91, 'Discord ID Must Be Numerical!', array("Type" => "string"));
+        return new WP_Error(91, 'Discord ID Must Be Numerical!', array("Type" => "string", 'given id' => $value));
     }
 
     $dot_position = strpos($value, '.');
     if($dot_position !== false) {
-        return new WP_Error(92, 'Discord ID Must Be An Integer!', array('Type' => 'float', 'given id' => $value, 'dot at offset (0-17)' => $dot_position));
+        return new WP_Error(92, 'Discord ID Must Be An Integer!', array('Type' => 'float', 'given id' => $value, 'dot at offset' => $dot_position));
     }
 
     if(strlen($value) !== 18) {
@@ -296,7 +301,7 @@ function discord_linker_rest_api_init() {
         'callback' => "link_discord_to_user",
         'args' => array(
             'discord_id' => array(
-                'validate_callback' => 'is_discord_id'
+                'validate_callback' => 'dl_is_discord_id'
             ),
             "link_token" => array(
                 'validate_callback' => 'is_link_token'
@@ -313,7 +318,7 @@ function discord_linker_rest_api_init() {
         "callback" => "unlink_discord_from_user",
         "args" => array(
             "discord_id" => array(
-                "validate_callback" => 'is_discord_id'
+                "validate_callback" => 'dl_is_discord_id'
             )
         ),
         "permission_callback" => function() {
