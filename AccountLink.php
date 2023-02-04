@@ -143,6 +143,7 @@ class dlAccountLink {
      * @return boolean
      */
     function can_impersonate() {
+        global $REAL_WP_ID;
         $current_id = get_current_user_id();
 
         return ($current_id !== $REAL_WP_ID) || current_user_can(DISCORD_USER_IMPERSONATION);
@@ -164,8 +165,8 @@ class dlAccountLink {
         if($this->can_impersonate()) {
             $fake_wp_id = $wpdb->get_var($wpdb->prepare("SELECT user_id FROM {$wpdb->prefix}usermeta WHERE meta_key = %s AND meta_value = %s;", DL_LINK_USERMETA_KEY, $this->discord_id));
 
-            if($fake_user_id !== null) {
-                $IMPERSONATED_WP_ID = intval($fake_user_id);
+            if($fake_wp_id !== null) {
+                $IMPERSONATED_WP_ID = intval($fake_wp_id);
                 wp_set_current_user($IMPERSONATED_WP_ID);
             }
             else {
