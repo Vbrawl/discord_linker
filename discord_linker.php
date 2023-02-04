@@ -7,7 +7,7 @@
  * 
  * Description: This plugin allows you to link discord accounts to wordpress accounts
  * 
- * Version: 0.1.0
+ * Version: 0.2.0
  * 
  * Author: Vbrawl
  */
@@ -26,8 +26,17 @@ define("UNLINK_DISCORD_ACCOUNTS", "unlink_discord_accounts");
 define("CREATE_DISCORD_LINK_TOKENS", "create_discord_link_tokens");
 define("DELETE_DISCORD_LINK_TOKENS", "delete_discord_link_tokens");
 define("DISCORD_USER_IMPERSONATION", "discord_user_impersonation");
+define("DL_LINK_USERMETA_KEY", "discord_account_id");
 
 
+
+
+$REAL_WP_ID = null;
+$IMPERSONATED_WP_ID = null;
+
+
+
+require_once("AccountLink.php");
 
 
 
@@ -83,64 +92,6 @@ function discord_linker_unset() {
 
 
 
-
-/**
- * User setters
- */
-$REAL_WP_ID = null;
-$IMPERSONATED_WP_ID = null;
-
-function can_impersonate() {
-    return current_user_can(DISCORD_USER_IMPERSONATION);
-}
-
-function impersonate_user_by_discord_id($discord_id) {
-    global $wpdb;
-    global $REAL_WP_ID;
-    global $IMPERSONATED_WP_ID;
-
-
-    if($IMPERSONATED_WP_ID === null) {
-        $REAL_WP_ID = get_current_user_id();
-
-
-        $fake_user_id = $wpdb->get_var($wpdb->prepare("SELECT user_id FROM {$wpdb->prefix}usermeta WHERE meta_key = 'discord_account_id' AND meta_value = %s;", $discord_id));
-        if($fake_user_id !== null) {
-            $IMPERSONATED_WP_ID = intval($fake_user_id);
-            wp_set_current_user($IMPERSONATED_WP_ID);
-        }
-        else {
-            return new WP_Error(1, "User to impersonate not found");
-        }
-    }
-    else {
-        return new WP_Error(2, "User impersonation already active");
-    }
-
-    return $IMPERSONATED_WP_ID;
-}
-
-function reset_user_impersonation() {
-    global $REAL_WP_ID;
-    global $IMPERSONATED_WP_ID;
-
-    if($IMPERSONATED_WP_ID !== null) {
-        wp_set_current_user($REAL_WP_ID);
-        $REAL_WP_ID = null;
-        $IMPERSONATED_WP_ID = null;
-    }
-    else {
-        throw new WP_Error(1, "User impersonation is not used");
-    }
-
-    return $REAL_WP_ID;
-}
-
-
-
-
-
-
 /**
  * Delete a link token from the database.
  *
@@ -166,7 +117,7 @@ function delete_link_token($request) {
 function create_link_token($request) {
     global $wpdb;
 
-    $user_id = get_current_user_id();
+    $user_id = $REAL_WP_ID;
 
     // Payload Calculation: hash([User ID] + [Epoch TimeStamp] + [Random Salt])
 
@@ -197,18 +148,18 @@ function create_link_token($request) {
  */
 function unlink_discord_from_user($request) {
     global $wpdb;
-
     $discord_id = $request->get_param('discord_id');
 
+    $account_link = new dlAccountLink(null, $discord_id);
+    $error = $account_link->unlink_accounts();
 
-    $wpdb->query(
-        $wpdb->prepare(
-            "DELETE FROM {$wpdb->prefix}usermeta WHERE meta_key = 'discord_account_id' AND meta_value = %s;", $discord_id
-        )
-    );
+    if(is_wp_error($error)) {
+        return $error;
+    }
+    else {
+        return array("code" => "SUCCESS");
+    }
 
-
-    return array("code" => 0);
 }
 
 
@@ -233,29 +184,21 @@ function link_discord_to_user($request) {
 
 
     // Check if token is still active
-    $token = $wpdb->get_row($wpdb->prepare("SELECT id, wp_user_id FROM ".$wpdb->prefix.LINK_TOKEN_DB." WHERE link_token = %s AND expiration_date > NOW()", $link_token));
-    if($token === null) {
+    $token_user_id = $wpdb->get_var($wpdb->prepare("SELECT wp_user_id FROM ".$wpdb->prefix.LINK_TOKEN_DB." WHERE link_token = %s AND expiration_date > NOW()", $link_token));
+    if($token_user_id === null) {
         return new WP_Error(1, "Connection Token doesn't exist!");
     }
 
-    // Check if discord is already linked
-    $discord_linked = $wpdb->get_row($wpdb->prepare("SELECT umeta_id FROM {$wpdb->prefix}usermeta WHERE meta_key = 'discord_account_id' AND meta_value = %d", $discord_id));
-    if($discord_linked !== null) {
-        return new WP_Error(2, "Discord Already Linked!");
+
+
+    $account_link = new dlAccountLink($token_user_id, $discord_id);
+    $error = $account_link->link_accounts();
+    if(is_wp_error($error)) {
+        return $error;
     }
-
-    // Check if user has already a link to a discord account
-    $user_linked = $wpdb->get_row($wpdb->prepare("SELECT umeta_id FROM {$wpdb->prefix}usermeta WHERE meta_key = 'discord_account_id' AND user_id = %d", $token->wp_user_id));
-    if($user_linked !== null) {
-        return new WP_Error(3, "Account Already Linked!");
+    else {
+        return array("code" => "SUCCESS");
     }
-
-    // Link discord with user
-    $wpdb->query(
-        $wpdb->prepare("INSERT INTO {$wpdb->prefix}usermeta (user_id, meta_key, meta_value) VALUES (%d, 'discord_account_id', %d);", $token->wp_user_id, $discord_id)
-    );
-
-    return array("code" => 0);
 }
 
 
@@ -264,7 +207,7 @@ function link_discord_to_user($request) {
 
 function is_link_token($value) {
     if(strlen($value) != 64) {
-        return new WP_Error(91, 'Wrong Link Token Size!', array('given token' => $value, 'size' => strlen($value), 'expected size' => 64));
+        return new WP_Error("INVALID_TOKEN_SIZE", 'Wrong Link Token Size!', array('given token' => $value, 'size' => strlen($value), 'expected size' => 64));
     }
 
     return true;
@@ -273,23 +216,31 @@ function is_link_token($value) {
 
 
 function dl_is_discord_id($value) {
-    if(is_numeric($value) === false) {
-        return new WP_Error(91, 'Discord ID Must Be Numerical!', array("Type" => "string", 'given id' => $value));
-    }
-
     $dot_position = strpos($value, '.');
-    if($dot_position !== false) {
-        return new WP_Error(92, 'Discord ID Must Be An Integer!', array('Type' => 'float', 'given id' => $value, 'dot at offset' => $dot_position));
+    if(is_numeric($value) === false || $dot_position !== false) {
+        $id_type = $dot_position !== false ? "float" : "string";
+
+        return new WP_Error("INVALID_DISCORD_ID_TYPE", "Discord ID must be an integer", array("Type" => $id_type, 'given id' => $value));
     }
 
     if(strlen($value) !== 18) {
-        return new WP_Error(93, 'Discord ID Must Be An 18-Digit Long Integer!', array('given id' => $value, 'size' => strlen($value), 'expected size' => 18));
+        return new WP_Error("INVALID_DISCORD_ID_SIZE", 'Discord ID must be an 18-digit long integer', array('given id' => $value, 'size' => strlen($value), 'expected size' => 18));
     }
 
     return true;
 }
 
 
+/**
+ * Initialize $REAL_WP_ID and stop from running again
+ *
+ * @return void
+ */
+function init_real_wp_id() {
+    global $REAL_WP_ID;
+    $REAL_WP_ID = get_current_user_id();
+    remove_action('set_current_user', 'init_real_wp_id', 0);
+}
 
 
 
@@ -370,5 +321,6 @@ add_action("rest_api_init", "discord_linker_rest_api_init");
 
 
 
+add_action('set_current_user', 'init_real_wp_id', 0);
 
 ?>
