@@ -7,7 +7,7 @@
  * 
  * Description: This plugin allows you to link discord accounts to wordpress accounts
  * 
- * Version: 0.2.0
+ * Version: 0.2.1
  * 
  * Author: Vbrawl
  */
@@ -110,7 +110,7 @@ function delete_link_token($request) {
         return new WP_Error(1, "Link token doesn't exist!");
     }
 
-    return array("code" => 0);
+    return array("code" => "SUCCESS");
 }
 
 
@@ -130,10 +130,10 @@ function create_link_token($request) {
     $rows_affected = $wpdb->query($query);
 
     if($rows_affected != 0) {
-        return array("code" => 0, "link_token" => $payload);
+        return array("code" => "SUCCESS", "link_token" => $payload);
     }
     else {
-        return new WP_Error(1, "Unknown Error!", array("data" => $query));
+        return new WP_Error("UNKNOWN_ERROR", "Unknown Error!", array("data" => $query));
     }
 }
 
@@ -186,7 +186,7 @@ function link_discord_to_user($request) {
     // Check if token is still active
     $token_user_id = $wpdb->get_var($wpdb->prepare("SELECT wp_user_id FROM ".$wpdb->prefix.LINK_TOKEN_DB." WHERE link_token = %s AND expiration_date > NOW()", $link_token));
     if($token_user_id === null) {
-        return new WP_Error(1, "Connection Token doesn't exist!");
+        return new WP_Error("LINK_TOKEN_NOT_FOUND", "Link Token doesn't exist!");
     }
 
 
