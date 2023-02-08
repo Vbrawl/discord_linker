@@ -114,6 +114,16 @@ function delete_link_token($request) {
 }
 
 
+
+
+
+
+/**
+ * Create a link token and add it to the database
+ *
+ * @param Object $request
+ * @return void
+ */
 function create_link_token($request) {
     global $wpdb;
 
@@ -203,8 +213,56 @@ function link_discord_to_user($request) {
 
 
 
+/**
+ * Get data about the linked user.
+ *
+ * @param Object $request
+ * @return void
+ */
+function get_account_details($request) {
+    $discord_id = $request->get_param('discord_id');
+
+    $account_link = new dlAccountLink(null, $discord_id);
+    if(!$account_link->linked_together()) {
+        return new WP_Error("ACCOUNT_NOT_LINKED", "Your discord account is not linked to a user!");
+    }
 
 
+    $error_or_id = $account_link->impersonate();
+    if(is_wp_error($error_or_id)) {
+        return $error_or_id;
+    }
+
+
+    $user = wp_get_current_user();
+
+    $details = array(
+        "id" => $user->ID,
+        "avatar" => get_avatar_url($user->ID),
+        "username" => $user->display_name,
+        "email" => $user->user_email,
+    );
+
+
+
+
+
+
+    $account_link->reset_impersonation();
+    return array("code" => "SUCCESS", "details" => $details);
+}
+
+
+
+
+
+
+/**
+ * Check if the parameter is a link token.
+ *
+ * @param string $value
+ * @return boolean
+ */
 function is_link_token($value) {
     if(strlen($value) != 64) {
         return new WP_Error("INVALID_TOKEN_SIZE", 'Wrong Link Token Size!', array('given token' => $value, 'size' => strlen($value), 'expected size' => 64));
@@ -214,7 +272,12 @@ function is_link_token($value) {
 }
 
 
-
+/**
+ * Check if the parameter is a discord id.
+ *
+ * @param string $value
+ * @return void
+ */
 function dl_is_discord_id($value) {
     $dot_position = strpos($value, '.');
     if(is_numeric($value) === false || $dot_position !== false) {
@@ -300,6 +363,17 @@ function discord_linker_rest_api_init() {
         "permission_callback" => function() {
             return current_user_can(CREATE_DISCORD_LINK_TOKENS);
         }
+    ));
+
+
+    register_rest_route("discord_linker/v1/discord", "/get_account_details/(?P<discord_id>.*)", array(
+        "methods" => "GET",
+        "callback" => "get_account_details",
+        "args" => array(
+            "discord_id" => array(
+                "validate_callback" => "dl_is_discord_id"
+            )
+        )
     ));
 }
 
