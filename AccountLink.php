@@ -109,8 +109,9 @@ class dlAccountLink {
      * @return void
      */
     function link_accounts() {
+        global $wpdb;
         if($this->available_link()) {
-            $wpdb->get_query($wpdb->prepare("INSERT INTO {$wpdb->prefix}usermeta (user_id, meta_key, meta_value) VALUES (%d, %s, %d)", $this->user_id, DL_LINK_USERMETA_KEY, $this->discord_id));
+            $wpdb->query($wpdb->prepare("INSERT INTO {$wpdb->prefix}usermeta (user_id, meta_key, meta_value) VALUES (%d, %s, %d)", $this->user_id, DL_LINK_USERMETA_KEY, $this->discord_id));
         }
         else {
             return new WP_Error("ALREADY_LINKED", "There is some active link in an account", array("user id" => $this->user_id, "discord id" => $this->discord_id));
@@ -125,6 +126,7 @@ class dlAccountLink {
      * @return void
      */
     function unlink_accounts() {
+        global $wpdb;
         if($this->linked_together()) {
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}usermeta WHERE meta_key = %s AND meta_value = %s AND user_id = %d", DL_LINK_USERMETA_KEY, $this->discord_id, $this->user_id));
         }
