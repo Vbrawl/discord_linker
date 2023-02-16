@@ -1,6 +1,8 @@
 <?php
 
 
+require_once("errors.php");
+
 
 class dlAccountLink {
 
@@ -105,7 +107,7 @@ class dlAccountLink {
     /**
      * Try to link the accounts together.
      *
-     * @throws WP_Error[ALREADY_LINKED]: When an account is already linked.
+     * @throws WP_Error[ACCOUNT_ALREADY_LINKED]: When an account is already linked.
      * @return void
      */
     function link_accounts() {
@@ -114,7 +116,7 @@ class dlAccountLink {
             $wpdb->query($wpdb->prepare("INSERT INTO {$wpdb->prefix}usermeta (user_id, meta_key, meta_value) VALUES (%d, %s, %d)", $this->user_id, DL_LINK_USERMETA_KEY, $this->discord_id));
         }
         else {
-            return new WP_Error("ALREADY_LINKED", "There is some active link in an account", array("user id" => $this->user_id, "discord id" => $this->discord_id));
+            return dl_error_ACCOUNT_ALREADY_LINKED();
         }
     }
 
@@ -122,7 +124,7 @@ class dlAccountLink {
     /**
      * Try to unlink the accounts.
      *
-     * @throws WP_Error[NOT_LINKED_TOGETHER]: When the accounts are not linked together.
+     * @throws WP_Error[ACCOUNT_NOT_LINKED]: When the accounts are not linked together.
      * @return void
      */
     function unlink_accounts() {
@@ -131,7 +133,7 @@ class dlAccountLink {
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}usermeta WHERE meta_key = %s AND meta_value = %s AND user_id = %d", DL_LINK_USERMETA_KEY, $this->discord_id, $this->user_id));
         }
         else {
-            return new WP_Error("NOT_LINKED_TOGETHER", "The accounts are not linked together", array("user id" => $this->user_id, "discord id" => $this->discord_id));
+            return dl_error_ACCOUNT_NOT_LINKED();
         }
     }
 
@@ -155,7 +157,7 @@ class dlAccountLink {
     /**
      * Impersonate another user.
      * 
-     * @throws WP_Error[USER_NOT_FOUND]: When the user we try to impersonate doesn't exist.
+     * @throws WP_Error[ACCOUNT_NOT_LINKED]: When the user we try to impersonate doesn't exist.
      * @throws WP_Error[INSUFFICIENT_PERMISSIONS]: When the current user doesn't have enough permissions to impersonate someone else.
      * @return int
      */
@@ -172,11 +174,11 @@ class dlAccountLink {
                 wp_set_current_user($IMPERSONATED_WP_ID);
             }
             else {
-                return new WP_Error("USER_NOT_FOUND", "The User you are trying to impersonate doesn't exist", array("discord id" => $this->discord_id));
+                return dl_error_ACCOUNT_NOT_LINKED();
             }
         }
         else {
-            return new WP_Error("INSUFFICIENT_PERMISSIONS", "You don't have enough permissions to impersonate other users", array("DISCORD_USER_IMPERSONATION" => $this->can_impersonate));
+            return dl_error_INSUFFICIENT_PERMISSIONS();
         }
 
         return $IMPERSONATED_WP_ID;
@@ -198,7 +200,7 @@ class dlAccountLink {
             $IMPERSONATED_WP_ID = null;
         }
         else {
-            throw new WP_Error("NOT_IMPERSONATING", "You don't impersonate anyone");
+            return dl_error_NOT_IMPERSONATING();
         }
 
         return $REAL_WP_ID;
