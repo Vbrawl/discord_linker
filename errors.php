@@ -34,7 +34,7 @@ function dl_error_INVALID_DISCORD_ID_TYPE() {
 function dl_error_INVALID_DISCORD_ID_SIZE($id, $expected_id_size) {
     $id_size = strlen($id);
 
-    return new WP_Error("INVALID_DISCORD_ID_SIZE", "Discord ID must be an ".$expected_id_size."-digit integer", array("id" => $id, "id_size" => $id_size, "expected_id_size" => $epxected_id_size));
+    return new WP_Error("INVALID_DISCORD_ID_SIZE", "Discord ID must be an ".$expected_id_size."-digit integer", array("id" => $id, "id_size" => $id_size, "expected_id_size" => $expected_id_size));
 }
 
 
