@@ -195,6 +195,11 @@ function link_discord_to_user($request) {
     $link_token = $request->get_param('link_token');
 
 
+    // Check if user is not already linked
+    $account_link = new dlAccountLink(null, $discord_id);
+    if(!$account_link->available_link()) {
+        return dl_error_ACCOUNT_ALREADY_LINKED();
+    }
 
     // Check if token is still active
     $token_user_id = $wpdb->get_var($wpdb->prepare("SELECT wp_user_id FROM ".$wpdb->prefix.LINK_TOKEN_DB." WHERE link_token = %s AND expiration_date > NOW()", $link_token));
@@ -202,9 +207,6 @@ function link_discord_to_user($request) {
         return dl_error_LINK_TOKEN_NOT_FOUND();
     }
 
-
-
-    $account_link = new dlAccountLink($token_user_id, $discord_id);
     $error = $account_link->link_accounts();
     if(is_wp_error($error)) {
         return $error;
