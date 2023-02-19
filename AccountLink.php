@@ -97,8 +97,16 @@ class dlAccountLink {
      */
     function available_link() {
         global $wpdb;
-        $discord_link_meta_id = $wpdb->get_var($wpdb->prepare("SELECT umeta_id FROM {$wpdb->prefix}usermeta WHERE meta_key = %s AND meta_value = %d", DL_LINK_USERMETA_KEY, $this->discord_id));
-        $user_link_meta_id = $wpdb->get_var($wpdb->prepare("SELECT umeta_id FROM {$wpdb->prefix}usermeta WHERE mete_key = %s AND user_id = %d", DL_LINK_USERMETA_KEY, $this->user_id));
+        $discord_link_meta_id = null;
+        $user_link_meta_id = null;
+
+        if($this->discord_id !== null) {
+            $discord_link_meta_id = $wpdb->get_var($wpdb->prepare("SELECT umeta_id FROM {$wpdb->prefix}usermeta WHERE meta_key = %s AND meta_value = %d", DL_LINK_USERMETA_KEY, $this->discord_id));
+        }
+
+        if($this->user_id !== null) {
+            $user_link_meta_id = $wpdb->get_var($wpdb->prepare("SELECT umeta_id FROM {$wpdb->prefix}usermeta WHERE mete_key = %s AND user_id = %d", DL_LINK_USERMETA_KEY, $this->user_id));
+        }
 
         return ($discord_link_meta_id === null) && ($user_link_meta_id === null);
     }
