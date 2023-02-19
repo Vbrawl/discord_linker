@@ -7,7 +7,7 @@
  * 
  * Description: This plugin allows you to link discord accounts to wordpress accounts
  * 
- * Version: 0.3.1
+ * Version: 0.3.2
  * 
  * Author: Vbrawl
  */
