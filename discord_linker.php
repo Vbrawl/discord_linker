@@ -7,7 +7,7 @@
  * 
  * Description: This plugin allows you to link discord accounts to wordpress accounts
  * 
- * Version: 0.3.2
+ * Version: 0.3.3
  * 
  * Author: Vbrawl
  */
@@ -206,6 +206,8 @@ function link_discord_to_user($request) {
     if($token_user_id === null) {
         return dl_error_LINK_TOKEN_NOT_FOUND();
     }
+
+    $account_link->user_id = $token_user_id;
 
     $error = $account_link->link_accounts();
     if(is_wp_error($error)) {
